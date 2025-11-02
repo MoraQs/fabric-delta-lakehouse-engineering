@@ -1,0 +1,95 @@
+name: FabricAdventureWorks-CICD-$(Date:yyyyMMdd)$(Rev:.r)
+
+# Define triggers
+trigger:
+  branches:
+    include:
+      - main
+      - feature/*
+
+pr:
+  branches:
+    include:
+      - main
+
+variables:
+- group: Fabric-AdvWorks-Variable_groups
+
+pool:
+  name: Default
+
+
+stages:
+# -----------------------------------------------------------------------------------------------------------------------
+# Deployment Stages
+# -----------------------------------------------------------------------------------------------------------------------
+  - stage: Deploy_DEV
+    displayName: 'Deploy to DEV'
+    dependsOn: Build
+    condition: succeeded()
+    variables:
+    - group: Fabric-AdvWorks-Variable_groups
+    - name: environment_name
+      value: DEV
+    - name: workspace_name
+      value: $(dev_workspace_name)
+    jobs:
+      - deployment: DeployFabricItems
+        displayName: 'Deploy Fabric Items'
+        environment: 'DEV'
+        # If using a self-hosted agent, ensure Python is installed or use UsePythonVersion
+        pool:
+          name: Default
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                - script: |
+                    "C:\Program Files\Python312\python.exe" --version
+                    "C:\Program Files\Python312\python.exe" -m pip install azure-identity fabric-cicd
+                  displayName: 'Install Python Packages'
+
+                - script: |
+                    "C:\Program Files\Python312\python.exe" deploy.py ^
+                      --spn-auth ^
+                      --workspace "$(workspace_name)" ^
+                      --src "$(Build.SourcesDirectory)/src"
+                  displayName: 'Run $(environment_name) Deployment Script'                 
+                  env:
+                      FABRIC_CLIENT_ID: $(fabric_client_id)
+                      FABRIC_CLIENT_SECRET: $(fabric_client_secret)
+                      FABRIC_TENANT_ID: $(tenant_id)
+
+  - stage: Deploy_PROD
+    displayName: 'Deploy to PROD'
+    dependsOn: Deploy_DEV
+    condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'main'))
+    variables:
+    - group: Fabric-AdvWorks-Variable_groups
+    - name: environment_name
+      value: PROD
+    - name: workspace_name
+      value: $(prod_workspace_name)
+    jobs:
+      - deployment: DeployFabricItemsPROD
+        displayName: 'Deploy Fabric Items to PROD'
+        environment: 'PROD'
+        pool:
+          name: Default
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+
+                - script: |
+                    "C:\Program Files\Python312\python.exe" deploy.py ^
+                      --spn-auth ^
+                      --workspace "$(workspace_name)" ^
+                      --src "$(Build.SourcesDirectory)/src"
+                  displayName: 'Run $(environment_name) Deployment Script'                 
+                  env:
+                      FABRIC_CLIENT_ID: $(fabric_client_id)
+                      FABRIC_CLIENT_SECRET: $(fabric_client_secret)
+                      FABRIC_TENANT_ID: $(tenant_id)
