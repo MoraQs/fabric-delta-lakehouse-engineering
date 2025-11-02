@@ -1,0 +1,331 @@
+{
+  "properties": {
+    "activities": [
+      {
+        "type": "Lookup",
+        "typeProperties": {
+          "source": {
+            "type": "AzureSqlSource",
+            "sqlReaderQuery": "SELECT \n    t.TABLE_NAME AS tableName,\n    t.TABLE_SCHEMA AS schemaName,\n    COALESCE(m.is_incremental, 0) AS isIncremental,\n    COALESCE(m.watermark_column, '') AS watermarkColumn,\n    COALESCE(m.last_loaded, '1900-01-01') AS lastLoadedDate,\n\tCOALESCE(m.last_loaded_int, 0) AS lastLoadedItem,\n\tm.watermark_type AS watermarkType\nFROM INFORMATION_SCHEMA.TABLES t\nLEFT JOIN dbo.ETL_Table_Metadata m\n    ON t.TABLE_NAME = m.table_name\nWHERE \n\tt.TABLE_SCHEMA = 'dbo' and \n\tt.TABLE_NAME IN ('FactInternetSales', 'DimAccount', 'DimCustomer', 'DimPromotion');",
+            "partitionOption": "None",
+            "queryTimeout": "02:00:00"
+          },
+          "datasetSettings": {
+            "type": "AzureSqlTable",
+            "typeProperties": {
+              "database": "AdventureWorksDB-8f99569b-a0f9-4e5b-9110-a8273b900cce"
+            },
+            "schema": [],
+            "externalReferences": {
+              "connection": "23a33105-1ee8-4495-951e-536c9a3d95d9"
+            },
+            "annotations": []
+          },
+          "firstRowOnly": false
+        },
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureInput": false,
+          "secureOutput": false
+        },
+        "name": "LookUp data from FabricSQL DB",
+        "dependsOn": []
+      },
+      {
+        "type": "ForEach",
+        "typeProperties": {
+          "items": {
+            "value": "@activity('LookUp data from FabricSQL DB').output.value",
+            "type": "Expression"
+          },
+          "activities": [
+            {
+              "type": "Copy",
+              "typeProperties": {
+                "source": {
+                  "type": "AzureSqlSource",
+                  "sqlReaderQuery": {
+                    "value": "@{if(\n  and(\n    equals(item().isIncremental, 1), \n    not(empty(activity('Get last watermark').output.firstRow.last_loaded))\n  ),\n  concat(\n    'SELECT * FROM ', item().schemaName, '.', item().tableName,\n    ' WHERE ', item().watermarkColumn, ' > ''', activity('Get last watermark').output.firstRow.last_loaded, ''''\n  ),\n  concat('SELECT * FROM ', item().schemaName, '.', item().tableName)\n)}",
+                    "type": "Expression"
+                  },
+                  "partitionOption": "None",
+                  "queryTimeout": "02:00:00",
+                  "datasetSettings": {
+                    "type": "AzureSqlTable",
+                    "typeProperties": {
+                      "schema": "dbo",
+                      "table": "DimCurrency",
+                      "database": "AdventureWorksDB-8f99569b-a0f9-4e5b-9110-a8273b900cce"
+                    },
+                    "schema": [],
+                    "externalReferences": {
+                      "connection": "23a33105-1ee8-4495-951e-536c9a3d95d9"
+                    },
+                    "annotations": []
+                  }
+                },
+                "sink": {
+                  "type": "ParquetSink",
+                  "formatSettings": {
+                    "type": "ParquetWriteSettings",
+                    "enableVertiParquet": true
+                  },
+                  "storeSettings": {
+                    "type": "LakehouseWriteSettings"
+                  },
+                  "datasetSettings": {
+                    "type": "Parquet",
+                    "typeProperties": {
+                      "location": {
+                        "type": "LakehouseLocation",
+                        "folderPath": {
+                          "value": "@concat(\n  'raw/',\n  'AdventureWorks', '/',\n  item().tableName, '/',\n  'Year=', formatDateTime(utcNow(), 'yyyy'), '/',\n  'Month=', formatDateTime(utcNow(), 'MM'), '/',\n  'Day=', formatDateTime(utcNow(), 'dd')\n)",
+                          "type": "Expression"
+                        },
+                        "fileName": {
+                          "value": "@concat(item().schemaName, '_',item().tableName, '_', formatDateTime(utcNow(), 'yyyyMMddHHmmss'), '.parquet')",
+                          "type": "Expression"
+                        }
+                      },
+                      "compressionCodec": "snappy"
+                    },
+                    "schema": [],
+                    "connectionSettings": {
+                      "name": "raqsconsole_LH",
+                      "properties": {
+                        "type": "Lakehouse",
+                        "typeProperties": {
+                          "artifactId": "61102d1e-c064-89ac-4f2b-201f4ea4f0aa",
+                          "workspaceId": "00000000-0000-0000-0000-000000000000",
+                          "rootFolder": "Files"
+                        },
+                        "externalReferences": {
+                          "connection": "9986c9b6-c764-4424-aa2f-8237f07ca486"
+                        },
+                        "annotations": []
+                      }
+                    },
+                    "annotations": []
+                  }
+                },
+                "translator": {
+                  "type": "TabularTranslator",
+                  "typeConversion": true,
+                  "typeConversionSettings": {
+                    "allowDataTruncation": true,
+                    "treatBooleanAsNumber": false
+                  }
+                },
+                "enableStaging": false
+              },
+              "policy": {
+                "timeout": "0.12:00:00",
+                "retry": 0,
+                "retryIntervalInSeconds": 30,
+                "secureInput": false,
+                "secureOutput": false
+              },
+              "name": "Copy data from each table",
+              "dependsOn": [
+                {
+                  "activity": "Get last watermark",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                },
+                {
+                  "activity": "Get new watermark",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "Lookup",
+              "typeProperties": {
+                "source": {
+                  "type": "AzureSqlSource",
+                  "sqlReaderQuery": {
+                    "value": "SELECT\n\tlast_loaded,\n\twatermark_column\nFROM dbo.ETL_Table_Metadata\nWHERE table_name = '@{item().tableName}'",
+                    "type": "Expression"
+                  },
+                  "partitionOption": "None",
+                  "queryTimeout": "02:00:00"
+                },
+                "datasetSettings": {
+                  "type": "AzureSqlTable",
+                  "typeProperties": {
+                    "database": "AdventureWorksDB-8f99569b-a0f9-4e5b-9110-a8273b900cce"
+                  },
+                  "schema": [],
+                  "externalReferences": {
+                    "connection": "23a33105-1ee8-4495-951e-536c9a3d95d9"
+                  },
+                  "annotations": []
+                },
+                "firstRowOnly": true
+              },
+              "policy": {
+                "timeout": "0.12:00:00",
+                "retry": 0,
+                "retryIntervalInSeconds": 30,
+                "secureInput": false,
+                "secureOutput": false
+              },
+              "name": "Get last watermark",
+              "dependsOn": []
+            },
+            {
+              "type": "Lookup",
+              "typeProperties": {
+                "source": {
+                  "type": "AzureSqlSource",
+                  "sqlReaderQuery": {
+                    "value": "@if(\n  and( \n    equals(item().isIncremental, 1),\n    not(empty(item().watermarkColumn))\n  ),\n  concat('SELECT MAX(', item().watermarkColumn, ') AS new_watermark FROM ', item().schemaName, '.', item().tableName),\n  'SELECT NULL AS new_watermark'\n)",
+                    "type": "Expression"
+                  },
+                  "partitionOption": "None",
+                  "queryTimeout": "02:00:00"
+                },
+                "datasetSettings": {
+                  "type": "AzureSqlTable",
+                  "typeProperties": {
+                    "database": "AdventureWorksDB-8f99569b-a0f9-4e5b-9110-a8273b900cce"
+                  },
+                  "schema": [],
+                  "externalReferences": {
+                    "connection": "23a33105-1ee8-4495-951e-536c9a3d95d9"
+                  },
+                  "annotations": []
+                }
+              },
+              "policy": {
+                "timeout": "0.12:00:00",
+                "retry": 0,
+                "retryIntervalInSeconds": 30,
+                "secureInput": false,
+                "secureOutput": false
+              },
+              "name": "Get new watermark",
+              "dependsOn": []
+            },
+            {
+              "type": "SqlServerStoredProcedure",
+              "typeProperties": {
+                "database": "AdventureWorksDB-8f99569b-a0f9-4e5b-9110-a8273b900cce",
+                "storedProcedureName": "[dbo].[usp_UpdateWatermark]",
+                "storedProcedureParameters": {
+                  "tableName": {
+                    "value": {
+                      "value": "@item().tableName",
+                      "type": "Expression"
+                    },
+                    "type": "String"
+                  },
+                  "newWatermark": {
+                    "value": {
+                      "value": "@activity('Get new watermark').output.firstRow.new_watermark",
+                      "type": "Expression"
+                    },
+                    "type": "Datetime"
+                  },
+                  "watermarkType": {
+                    "value": "datetime",
+                    "type": "String"
+                  }
+                }
+              },
+              "externalReferences": {
+                "connection": "23a33105-1ee8-4495-951e-536c9a3d95d9"
+              },
+              "policy": {
+                "timeout": "0.12:00:00",
+                "retry": 0,
+                "retryIntervalInSeconds": 30,
+                "secureInput": false,
+                "secureOutput": false
+              },
+              "name": "Update watermark",
+              "dependsOn": [
+                {
+                  "activity": "Copy data from each table",
+                  "dependencyConditions": [
+                    "Succeeded"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "name": "Iterate through each looked up table",
+        "dependsOn": [
+          {
+            "activity": "LookUp data from FabricSQL DB",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ]
+      },
+      {
+        "type": "TridentNotebook",
+        "typeProperties": {
+          "notebookId": "5360b72f-4f27-84cf-45fb-ce95adb0a206",
+          "workspaceId": "00000000-0000-0000-0000-000000000000"
+        },
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureInput": false,
+          "secureOutput": false
+        },
+        "name": "Load raw files to bronze layer as delta tables",
+        "dependsOn": [
+          {
+            "activity": "Iterate through each looked up table",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ]
+      },
+      {
+        "type": "TridentNotebook",
+        "typeProperties": {
+          "notebookId": "dc0a21db-39e0-47dd-8526-8997e278d2cb",
+          "workspaceId": "6df05e67-30af-48c3-8841-b1aa8f82e95e"
+        },
+        "policy": {
+          "timeout": "0.12:00:00",
+          "retry": 0,
+          "retryIntervalInSeconds": 30,
+          "secureInput": false,
+          "secureOutput": false
+        },
+        "name": "Transform data to datamart",
+        "state": "Inactive",
+        "onInactiveMarkAs": "Succeeded",
+        "dependsOn": [
+          {
+            "activity": "Load raw files to bronze layer as delta tables",
+            "dependencyConditions": [
+              "Succeeded"
+            ]
+          }
+        ]
+      }
+    ],
+    "parameters": {
+      "tableName": {
+        "type": "string"
+      },
+      "schemaName": {
+        "type": "string"
+      }
+    }
+  }
+}
