@@ -30,7 +30,7 @@ stages:
     variables:
     - group: Fabric-AdvWorks-Variable_groups
     - name: environment_name
-      value: DEV
+      value: UAT
     - name: workspace_name
       value: $(dev_workspace_name)
     jobs:
