@@ -1,0 +1,11 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "Lakehouse",
+    "displayName": "raqsconsole_LH"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "61102d1e-c064-89ac-4f2b-201f4ea4f0aa"
+  }
+}
