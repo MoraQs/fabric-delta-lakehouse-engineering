@@ -50,7 +50,7 @@ stages:
                   displayName: 'Install Python Packages'
 
                 - script: |
-                    "C:\Program Files\Python312\python.exe" deploy.py ^
+                    "C:\Users\Dell\AppData\Local\Programs\Python\Python311\python.exe" deploy.py ^
                       --spn-auth ^
                       --workspace "$(workspace_name)" ^
                       --src "$(Build.SourcesDirectory)/src"
