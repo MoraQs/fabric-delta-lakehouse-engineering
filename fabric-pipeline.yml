@@ -45,8 +45,8 @@ stages:
               steps:
                 - checkout: self
                 - script: |
-                    "C:\Program Files\Python312\python.exe" --version
-                    "C:\Program Files\Python312\python.exe" -m pip install azure-identity fabric-cicd
+                    "C:\Users\Dell\AppData\Local\Programs\Python\Python311\python.exe" --version
+                    "C:\Users\Dell\AppData\Local\Programs\Python\Python311\python.exe" --version -m pip install azure-identity fabric-cicd
                   displayName: 'Install Python Packages'
 
                 - script: |
@@ -83,7 +83,7 @@ stages:
                 - checkout: self
 
                 - script: |
-                    "C:\Program Files\Python312\python.exe" deploy.py ^
+                    "C:\Users\Dell\AppData\Local\Programs\Python\Python311\python.exe" --version deploy.py ^
                       --spn-auth ^
                       --workspace "$(workspace_name)" ^
                       --src "$(Build.SourcesDirectory)/src"
