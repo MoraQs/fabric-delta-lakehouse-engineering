@@ -6,7 +6,7 @@
         "typeProperties": {
           "source": {
             "type": "AzureSqlSource",
-            "sqlReaderQuery": "SELECT \n    t.TABLE_NAME AS tableName,\n    t.TABLE_SCHEMA AS schemaName,\n    COALESCE(m.is_incremental, 0) AS isIncremental,\n    COALESCE(m.watermark_column, '') AS watermarkColumn,\n    COALESCE(m.last_loaded, '1900-01-01') AS lastLoadedDate,\n\tCOALESCE(m.last_loaded_int, 0) AS lastLoadedItem,\n\tm.watermark_type AS watermarkType\nFROM INFORMATION_SCHEMA.TABLES t\nLEFT JOIN dbo.ETL_Table_Metadata m\n    ON t.TABLE_NAME = m.table_name\nWHERE \n\tt.TABLE_SCHEMA = 'dbo' and \n\tt.TABLE_NAME IN ('FactInternetSales', 'DimAccount', 'DimCustomer', 'DimPromotion');",
+            "sqlReaderQuery": "\nSELECT \n    t.TABLE_NAME AS tableName,\n    t.TABLE_SCHEMA AS schemaName,\n    COALESCE(m.is_incremental, 0) AS isIncremental,\n    COALESCE(m.watermark_column, '') AS watermarkColumn,\n    COALESCE(m.last_loaded, '1900-01-01') AS lastLoadedDate,\n\tm.watermark_type AS watermarkType,\n\tm.table_type AS tableType\nFROM INFORMATION_SCHEMA.TABLES t\nLEFT JOIN dbo.ETL_Table_Metadata m\n    ON t.TABLE_NAME = m.table_name\nWHERE \n\tt.TABLE_SCHEMA = 'dbo' and \n\tt.TABLE_NAME IN ('FactInternetSales', 'DimAccount', 'DimCustomer', 'DimPromotion');",
             "partitionOption": "None",
             "queryTimeout": "02:00:00"
           },
@@ -85,7 +85,7 @@
                           "type": "Expression"
                         },
                         "fileName": {
-                          "value": "@concat(item().schemaName, '_',item().tableName, '_', formatDateTime(utcNow(), 'yyyyMMddHHmmss'), '.parquet')",
+                          "value": "@if(\n    equals(item().tableType, 'Dimension'),\n    concat(item().schemaName, '_', item().tableName, '.parquet'),\n    concat(item().schemaName, '_', item().tableName, '_', formatDateTime(utcNow(), 'yyyyMMddHHmmss'), '.parquet')\n    )",
                           "type": "Expression"
                         }
                       },

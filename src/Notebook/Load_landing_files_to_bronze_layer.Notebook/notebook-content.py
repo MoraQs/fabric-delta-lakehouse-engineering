@@ -29,15 +29,6 @@ import pyspark.sql.functions as F
 from pyspark.sql.utils import AnalysisException
 from notebookutils import mssparkutils
 
-# METADATA ********************
-
-# META {
-# META   "language": "python",
-# META   "language_group": "synapse_pyspark"
-# META }
-
-# CELL ********************
-
 spark.conf.set("spark.databricks.delta.schema.autoMerge.enabled", "true")
 
 # METADATA ********************
@@ -55,7 +46,17 @@ RAW_PATH = "Files/raw"
 BRONZE_SCHEMA = "bronze"
 AUDIT_TABLE = "meta_lakehouse.bronze_load_audit"
 APPEND_TIMESTAMP = True
-OVERWRITE_MODE = "overwrite"
+
+# Define which tables are Dimensions (Snapshot/Overwrite) vs. Facts (Incremental/Append)
+# IMPORTANT: Adjust this list to match your actual table names (e.g., AdventureWorks/DimPromotion)
+DIMENSION_TABLES = [
+    "AdventureWorks/DimPromotion",
+    "AdventureWorks/DimCustomer",
+    "AdventureWorks/DimAccount"
+]
+
+# Get the current date to target only today's partition
+TODAY_PATH_FRAGMENT = f"Year={datetime.datetime.utcnow().strftime('%Y')}/Month={datetime.datetime.utcnow().strftime('%m')}/Day={datetime.datetime.utcnow().strftime('%d')}"
 
 # Ensure RAW_PATH ends without a slash for consistent string manipulation
 RAW_PATH_CLEANED = RAW_PATH.rstrip("/")
@@ -69,51 +70,66 @@ RAW_PATH_CLEANED = RAW_PATH.rstrip("/")
 
 # CELL ********************
 
-# 🚀 DISCOVERY STAGE
+# Cell 3: Discovery Stage - Find and Group Today's Files
 
-print("🔍 Scanning raw zone for parquet files...")
+print(f"🔍 Scanning raw zone for files in today's partition: {TODAY_PATH_FRAGMENT}")
 
-# List all files in the raw zone recursively
+# List all files, but only those matching today's partition path for efficiency.
 all_files = []
-def list_files_recursive(path):
+def list_current_day_files(path):
+    """
+    Lists files only in the current day's partition path for all tables.
+    Handles the structure: RAW_PATH / SourceSystem / TableName / Year=...
+    """
     try:
-        # NOTE: mssparkutils.fs.ls() returns paths that include the full mount point/container
-        for item in mssparkutils.fs.ls(path):
-            if item.isDir:
-                list_files_recursive(item.path)
-            elif item.name.endswith(".parquet"):
-                all_files.append(item.path)
+        # 1. List the source system folders (e.g., AdventureWorks) directly under RAW_PATH
+        for source_folder in mssparkutils.fs.ls(path):
+            if source_folder.isDir:
+                # 2. List the table folders (e.g., DimPromotion, DimCustomer) inside the source system
+                for table_folder in mssparkutils.fs.ls(source_folder.path):
+                    if table_folder.isDir:
+                        # Construct the expected daily snapshot path (e.g., .../DimPromotion/Year=2025/Month=11/Day=03)
+                        daily_path = f"{table_folder.path.rstrip('/')}/{TODAY_PATH_FRAGMENT}"
+                        
+                        try:
+                            # 3. Check the specific daily partition path
+                            if mssparkutils.fs.exists(daily_path):
+                                # 4. List the files (e.g., snapshot.parquet or multiple time-stamped files)
+                                for item in mssparkutils.fs.ls(daily_path):
+                                    if not item.isDir and item.name.endswith(".parquet"):
+                                        all_files.append(item.path)
+                        except Exception as e:
+                            # Ignoring file access exceptions for non-existent daily paths
+                            pass
+
     except Exception as e:
         print(f"⚠️ Failed to access {path}: {e}")
 
-list_files_recursive(RAW_PATH_CLEANED)
+list_current_day_files(RAW_PATH_CLEANED)
 
-print(f"✅ Found {len(all_files)} parquet files.")
+print(f"✅ Found {len(all_files)} parquet files targeted for today's load.")
 
-# Group files by logical table (assume folder right above parquet)
+
+# Group files by logical table
 table_files = {}
 for f in all_files:
-    # Relative path should be: AdventureWorks/DimAccount/Year=2025/.../file.parquet
-    
+    # Example f: Files/raw/AdventureWorks/DimPromotion/Year=2025/.../snapshot.parquet
     relative_path = f.split(RAW_PATH_CLEANED, 1)[-1].strip("/")
     
-    # The logical table name is the first part of the relative path, assuming RAW_PATH is /Files/raw
-    # and the immediate subfolders define the table/dataset.
-    parts = relative_path.split("/")
-    
-    # Heuristic for table name: Take the first two non-partition folders (e.g., /AdventureWorks/DimAccount)
-    # or just the top folder if there's no deeper structure. Adjust this logic based on your exact file convention.
-    if len(parts) > 1 and not ("=" in parts[1]): # Check if the second part is likely not a partition folder (e.g. Year=2025)
-        # Assuming two-level table structure: Dataset/Table (e.g., AdventureWorks/DimAccount)
-        table_name = "/".join(parts[0:2])
+    # Extract the clean table name (e.g., "AdventureWorks/DimPromotion")
+    if "Year=" in relative_path:
+        table_path_only = relative_path.split("Year=")[0].rstrip("/")
     else:
-        # Assuming one-level table structure: Table (e.g., DimAccount)
-        table_name = parts[0]
+        parts = relative_path.split("/")
+        table_path_only = "/".join(parts[0:2])
         
-    table_files.setdefault(table_name, []).append(f)
+    table_files.setdefault(table_path_only, []).append(f)
 
 print(f"📂 Found {len(table_files)} tables to process.\n")
 
+# Exit early if no files were found to process
+if not table_files:
+    print("❌ Critical: No tables found for today's load. Check pipeline output or RAW_PATH.")
 
 # METADATA ********************
 
@@ -124,93 +140,107 @@ print(f"📂 Found {len(table_files)} tables to process.\n")
 
 # CELL ********************
 
-
-# 🧱 Processing Files
+# Cell 4: Processing Setup
 
 audit_entries = []
 
-for table_name, files in table_files.items():
-    print(f"▶️ Processing {table_name} ({len(files)} files)")
+# METADATA ********************
 
-    start_time = datetime.datetime.utcnow()
-    valid_dfs = []
-    total_rows = 0
-    status = "SUCCESS"
-    error_message = None
+# META {
+# META   "language": "python",
+# META   "language_group": "synapse_pyspark"
+# META }
 
-    # Step 1: Try reading each parquet file
-    # NOTE: The spark.read.parquet(files_list) approach is usually more efficient
-    # but reading individually handles bad files better, as implemented here.
-    for f in files:
+# CELL ********************
+
+# Cell 5: Core Processing Loop - Read, Union, and Write to Bronze Delta Table
+
+# Skip loop if no tables were found in Cell 3
+if table_files:
+    for table_name, files in table_files.items():
+        
+        # Determine Write Mode
+        is_dimension = table_name in DIMENSION_TABLES
+        write_mode = "overwrite" if is_dimension else "append"
+        
+        print(f"▶️ Processing {table_name} ({len(files)} files) - Mode: {write_mode.upper()}")
+
+        start_time = datetime.datetime.utcnow()
+        valid_dfs = []
+        total_rows = 0
+        status = "SUCCESS"
+        error_message = None
+
+        # Step 1: Try reading each parquet file
+        for f in files:
+            try:
+                df = (
+                    spark.read
+                    .option("mergeSchema", "true")
+                    .parquet(f)
+                )
+                valid_dfs.append(df)
+            except Exception as e:
+                print(f"⚠️ Skipping bad file: {f}")
+                print(f"   Reason: {str(e)[:200]}")
+
+        # Step 2: Skip table if no valid files
+        if not valid_dfs:
+            print(f"❌ No valid data found for {table_name}, skipping.\n")
+            audit_entries.append((table_name, len(files), 0, start_time, datetime.datetime.utcnow(), "FAILED", "No valid files"))
+            continue
+
+        # Step 3: Union all DataFrames safely
         try:
-            df = (
-                spark.read
-                .option("mergeSchema", "true")
-                .parquet(f)
-            )
-            valid_dfs.append(df)
+            df_final = valid_dfs[0]
+            for next_df in valid_dfs[1:]:
+                df_final = df_final.unionByName(next_df, allowMissingColumns=True)
         except Exception as e:
-            print(f"⚠️ Skipping bad file: {f}")
-            print(f"   Reason: {str(e)[:200]}")
+            status = "FAILED"
+            error_message = f"Union failed: {str(e)[:200]}"
+            print(f"❌ Union failed for {table_name}: {error_message}")
+            audit_entries.append((table_name, len(files), 0, start_time, datetime.datetime.utcnow(), status, error_message))
+            continue
 
-    # Step 2: Skip table if no valid files
-    if not valid_dfs:
-        print(f"❌ No valid data found for {table_name}, skipping.\n")
-        # Ensure the error_message fits the schema
-        audit_entries.append((table_name, len(files), 0, start_time, datetime.datetime.utcnow(), "FAILED", "No valid files"))
-        continue
-
-    # Step 3: Union all DataFrames safely
-    try:
-        df_final = valid_dfs[0]
-        for next_df in valid_dfs[1:]:
-            df_final = df_final.unionByName(next_df, allowMissingColumns=True)
-    except Exception as e:
-        status = "FAILED"
-        error_message = f"Union failed: {str(e)[:200]}"
-        print(f"❌ Union failed for {table_name}: {error_message}")
-        audit_entries.append((table_name, len(files), 0, start_time, datetime.datetime.utcnow(), status, error_message))
-        continue
-
-    # Step 4: Add ingestion timestamp
-    if APPEND_TIMESTAMP:
-        df_final = df_final.withColumn("load_timestamp_utc_bronze", F.current_timestamp())
-    
-    # 🌟 CORRECTION: Calculate row count *before* writing to avoid a second expensive action
-    try:
-        total_rows = df_final.count()
-    except Exception as e:
-        print(f"⚠️ Could not count rows for {table_name}. Proceeding with write (0 count logged).")
-        total_rows = 0 # Log 0 if count fails, but still attempt write
-
-    # Step 5: Write to Bronze Table
-    table_clean_name = table_name.replace("/", "_").lower()
-    print(f"💾 Writing {table_name} → {BRONZE_SCHEMA}.{table_clean_name} ({total_rows} rows)")
-
-    try:
-        # Use Delta format for Bronze tables for schema evolution, ACID properties
-        df_final.write.format("delta").mode(OVERWRITE_MODE).saveAsTable(f"{BRONZE_SCHEMA}.{table_clean_name}")
-        print(f"✅ {table_name} successfully loaded.\n")
-    except AnalysisException as e:
-        status = "FAILED"
-        error_message = f"Write failed (Analysis): {str(e)[:200]}"
-        print(f"❌ Write failed for {table_name}: {error_message}")
-    except Exception as e:
-        status = "FAILED"
-        # Truncate traceback to fit in the audit table column
-        formatted_traceback = traceback.format_exc().replace('\n', ' // ')
-        # Now, use the temporary variable in the f-string
-        error_message = f"Unexpected: {formatted_traceback[:300]}"
+        # Step 4: Add ingestion timestamp
+        if APPEND_TIMESTAMP:
+            df_final = df_final.withColumn("load_timestamp_utc_bronze", F.current_timestamp())
         
-        print(f"❌ Unexpected error for {table_name}: {error_message}")
+        # Calculate row count
+        try:
+            total_rows = df_final.count()
+        except Exception as e:
+            print(f"⚠️ Could not count rows for {table_name}. Proceeding with write (0 count logged).")
+            total_rows = 0
+
+        # Step 5: Write to Bronze Delta Table
+        table_clean_name = table_name.replace("/", "_").lower()
+        full_table_name = f"{BRONZE_SCHEMA}.{table_clean_name}"
         
-    # Step 6: Log the result (total_rows calculated earlier)
-    # total_rows is 0 if write failed, but the pre-count is a better reflection of what was attempted.
-    # We re-evaluate total_rows to 0 if the write was a hard fail.
-    if status == "FAILED":
-         total_rows = 0
-         
-    audit_entries.append((table_name, len(files), total_rows, start_time, datetime.datetime.utcnow(), status, error_message))
+        print(f"💾 Writing {table_name} → {full_table_name} ({total_rows} rows) using {write_mode.upper()} mode.")
+
+        try:
+            df_final.write.format("delta").mode(write_mode).saveAsTable(full_table_name)
+            print(f"✅ {table_name} successfully loaded.\n")
+        except AnalysisException as e:
+            status = "FAILED"
+            # 🐛 DEBUG: Print full analysis exception message
+            print(f"❌ WRITE FAILED (AnalysisException) for {table_name}: {e}")
+            error_message = f"Write failed (Analysis): {str(e)}"
+        except Exception as e:
+            status = "FAILED"
+            # 🐛 DEBUG: Print full traceback for unexpected errors
+            print(f"❌ WRITE FAILED (Unexpected Error) for {table_name}: {e}")
+            formatted_traceback = traceback.format_exc().replace('\n', ' // ')
+            error_message = f"Unexpected: {formatted_traceback[:300]}"
+            
+        # Step 6: Log the result
+        if status == "FAILED":
+            total_rows = 0
+                
+        audit_entries.append((table_name, len(files), total_rows, start_time, datetime.datetime.utcnow(), status, error_message))
+else:
+    print("ℹ️ Skipping Core Processing Loop because no files were found in the discovery stage (Cell 3).")
 
 # METADATA ********************
 
@@ -221,7 +251,7 @@ for table_name, files in table_files.items():
 
 # CELL ********************
 
-# 🧾 Audit Logging 
+# Cell 6: Audit Logging
 
 if audit_entries:
     print(f"\n🪵 Writing load audit ({len(audit_entries)} entries)...")
@@ -239,7 +269,7 @@ if audit_entries:
     df_audit = spark.createDataFrame(audit_entries, schema=audit_schema)
 
     try:
-        # Use Delta format for the Audit table
+        # Ensure the Audit table always appends
         df_audit.write.format("delta").mode("append").saveAsTable(AUDIT_TABLE)
         print(f"✅ Audit successfully logged to {AUDIT_TABLE}")
     except Exception as e:
@@ -248,6 +278,7 @@ else:
     print("ℹ️ No audit entries to log.")
 
 print("\n🏁 Bronze load process completed.")
+
 
 # METADATA ********************
 
