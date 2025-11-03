@@ -13,7 +13,7 @@ pr:
       - main
 
 variables:
-- group: Fabric-AdvWorks-Variable_groups
+- group: Fabric_AdvWorksVaria_ble_groups
 
 pool:
   name: Default
@@ -27,7 +27,7 @@ stages:
     displayName: 'Deploy to UAT'
     condition: succeeded()
     variables:
-    - group: Fabric-AdvWorks-Variable_groups
+    - group: Fabric_AdvWorksVaria_ble_groups
     - name: environment_name
       value: UAT
     - name: workspace_name
@@ -65,7 +65,7 @@ stages:
     dependsOn: Deploy_UAT
     condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'main'))
     variables:
-    - group: Fabric-AdvWorks-Variable_groups
+    - group: Fabric_AdvWorksVaria_ble_groups
     - name: environment_name
       value: PROD
     - name: workspace_name
