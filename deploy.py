@@ -35,10 +35,10 @@ else:
 
     credential = ClientSecretCredential(client_id=client_id, client_secret=client_secret, tenant_id=tenant_id)
 
-target_workspace = FabricWorkspace(    
-    workspace_name = workspace_name,    
+target_workspace = FabricWorkspace(
+    workspace_name = workspace_name,
     repository_directory = src_path,
-    item_type_in_scope = ["Notebook", "DataPipeline", "Environment"],      
+    item_type_in_scope = ["Lakehouse", "Warehouse", "Notebook", "DataPipeline", "Environment"],
     token_credential = credential,
 )
 
