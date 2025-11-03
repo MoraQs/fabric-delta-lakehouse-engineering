@@ -7,6 +7,10 @@ trigger:
       - main
       - feature/*
 
+  paths:
+      include:
+        - '**/src/**'
+
 pr:
   branches:
     include:
