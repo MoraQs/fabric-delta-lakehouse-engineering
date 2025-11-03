@@ -13,7 +13,7 @@ pr:
       - main
 
 variables:
-- group: Fabric_AdvWorksVaria_ble_groups
+- group: Fabric_AdvWorksVariable_groups
 
 pool:
   name: Default
@@ -27,11 +27,11 @@ stages:
     displayName: 'Deploy to UAT'
     condition: succeeded()
     variables:
-    - group: Fabric_AdvWorksVaria_ble_groups
+    - group: Fabric_AdvWorksVariable_groups
     - name: environment_name
       value: UAT
     - name: workspace_name
-      value: $(dev_workspace_name)
+      value: $(uat_workspace_name)
     jobs:
       - deployment: DeployFabricItems
         displayName: 'Deploy Fabric Items'
@@ -46,6 +46,7 @@ stages:
                 - checkout: self
                 - script: |
                     "C:\Program Files\Python312\python.exe" --version
+                    "C:\Program Files\Python312\python.exe" -m pip install --upgrade pip
                     "C:\Program Files\Python312\python.exe" -m pip install azure-identity fabric-cicd
                   displayName: 'Install Python Packages'
 
@@ -65,7 +66,7 @@ stages:
     dependsOn: Deploy_UAT
     condition: and(succeeded(), eq(variables['Build.SourceBranchName'], 'main'))
     variables:
-    - group: Fabric_AdvWorksVaria_ble_groups
+    - group: Fabric_AdvWorksVariable_groups
     - name: environment_name
       value: PROD
     - name: workspace_name
