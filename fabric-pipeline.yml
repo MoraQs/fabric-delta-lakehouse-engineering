@@ -25,7 +25,6 @@ stages:
 # -----------------------------------------------------------------------------------------------------------------------
   - stage: Deploy_UAT
     displayName: 'Deploy to UAT'
-    dependsOn: Build
     condition: succeeded()
     variables:
     - group: Fabric-AdvWorks-Variable_groups
