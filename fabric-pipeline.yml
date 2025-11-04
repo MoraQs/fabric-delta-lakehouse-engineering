@@ -58,8 +58,7 @@ stages:
                     "C:\Program Files\Python312\python.exe" "$(Build.SourcesDirectory)\deploy.py" ^
                       --spn-auth ^
                       --workspace "$(workspace_name)" ^
-                      --src "$(Build.SourcesDirectory)\src" ^
-                      
+                      --src "$(Build.SourcesDirectory)\src"
                   displayName: 'Run $(environment_name) Deployment Script'                 
                   env:
                       FABRIC_CLIENT_ID: $(fabric_client_id)
