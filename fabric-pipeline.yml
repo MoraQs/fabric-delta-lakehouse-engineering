@@ -55,12 +55,13 @@ stages:
                   displayName: 'Install Python Packages'
 
                 - script: |
-                    "C:\Program Files\Python312\python.exe" deploy.py ^
+                    "C:\Program Files\Python312\python.exe" "$(Build.SourcesDirectory)\deploy.py" ^
                       --spn-auth ^
                       --workspace "$(workspace_name)" ^
-                      --src "$(Build.SourcesDirectory)/src"
-                      --parameter-file "$(Build.SourcesDirectory)/src/parameter.yml" ^
+                      --src "$(Build.SourcesDirectory)\src" ^
+                      --parameter-file "$(Build.SourcesDirectory)\src\parameter.yml" ^
                       --environment "$(environment_name)"
+                      
                   displayName: 'Run $(environment_name) Deployment Script'                 
                   env:
                       FABRIC_CLIENT_ID: $(fabric_client_id)
@@ -93,7 +94,7 @@ stages:
                     "C:\Program Files\Python312\python.exe" deploy.py ^
                       --spn-auth ^
                       --workspace "$(workspace_name)" ^
-                      --src "$(Build.SourcesDirectory)/src"
+                      --src "$(Build.SourcesDirectory)/src" ^
                       --parameter-file "$(Build.SourcesDirectory)/src/parameter.yml" ^
                       --environment "$(environment_name)"
                   displayName: 'Run $(environment_name) Deployment Script'                 
