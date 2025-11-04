@@ -1,5 +1,5 @@
-parameters:
-  find_replace:
-    "4ea4f0aa-201f-4f2b-89ac-c06461102d1e":
+find_replace:
+  - find_value: "4ea4f0aa-201f-4f2b-89ac-c06461102d1e"
+    replace_value:
       UAT: "bafeaeb1-05a4-4663-a477-ff63f768d39d"
       PROD: "f35b099f-516e-44ea-a0a7-ad4be4dc0172"
