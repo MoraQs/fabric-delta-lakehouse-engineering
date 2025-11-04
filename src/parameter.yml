@@ -3,3 +3,7 @@ find_replace:
     replace_value:
       UAT: "bafeaeb1-05a4-4663-a477-ff63f768d39d"
       PROD: "f35b099f-516e-44ea-a0a7-ad4be4dc0172"
+  - find_value: "dev_raqsconsole_LH"
+    replace_value:
+      UAT: "uat_raqsconsole_LH"
+      PROD: "raqsconsole_LH"
