@@ -59,6 +59,8 @@ stages:
                       --spn-auth ^
                       --workspace "$(workspace_name)" ^
                       --src "$(Build.SourcesDirectory)/src"
+                      --parameter-file "$(Build.SourcesDirectory)/src/parameter.yml" ^
+                      --environment "$(environment_name)"
                   displayName: 'Run $(environment_name) Deployment Script'                 
                   env:
                       FABRIC_CLIENT_ID: $(fabric_client_id)
@@ -92,6 +94,8 @@ stages:
                       --spn-auth ^
                       --workspace "$(workspace_name)" ^
                       --src "$(Build.SourcesDirectory)/src"
+                      --parameter-file "$(Build.SourcesDirectory)/src/parameter.yml" ^
+                      --environment "$(environment_name)"
                   displayName: 'Run $(environment_name) Deployment Script'                 
                   env:
                       FABRIC_CLIENT_ID: $(fabric_client_id)
