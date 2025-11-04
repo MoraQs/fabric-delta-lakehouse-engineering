@@ -1,0 +1,5 @@
+find_replace:
+    # This is the correct target for replacement
+    "4ea4f0aa-201f-4f2b-89ac-c06461102d1e":             # DEV GUID
+        UAT: "bafeaeb1-05a4-4663-a477-ff63f768d39d"     # UAT GUID
+        PROD: "f35b099f-516e-44ea-a0a7-ad4be4dc0172"    # PROD GUID
