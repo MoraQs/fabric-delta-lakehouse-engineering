@@ -5,3 +5,4 @@ find_replace:
   - find_value: "dev_raqsconsole_LH"
     replace_value:
       UAT: "uat_raqsconsole_LH"
+      PROD: "raqsconsole_LH"
