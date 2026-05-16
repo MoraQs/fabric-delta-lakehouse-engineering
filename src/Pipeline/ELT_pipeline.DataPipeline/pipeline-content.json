@@ -6,7 +6,7 @@
         "typeProperties": {
           "source": {
             "type": "AzureSqlSource",
-            "sqlReaderQuery": "\nSELECT \n    t.TABLE_NAME AS tableName,\n    t.TABLE_SCHEMA AS schemaName,\n    COALESCE(m.is_incremental, 0) AS isIncremental,\n    COALESCE(m.watermark_column, '') AS watermarkColumn,\n    COALESCE(m.last_loaded, '1900-01-01') AS lastLoadedDate,\n\tm.watermark_type AS watermarkType,\n\tm.table_type AS tableType\nFROM INFORMATION_SCHEMA.TABLES t\nLEFT JOIN dbo.ETL_Table_Metadata m\n    ON t.TABLE_NAME = m.table_name\nWHERE \n\tt.TABLE_SCHEMA = 'dbo' and \n\tt.TABLE_NAME IN ('FactInternetSales', 'DimAccount', 'DimCustomer', 'DimPromotion');",
+            "sqlReaderQuery": "\nSELECT \n    t.TABLE_NAME AS tableName,\n    t.TABLE_SCHEMA AS schemaName,\n    COALESCE(m.is_incremental, 0) AS isIncremental,\n    COALESCE(m.watermark_column, '') AS watermarkColumn,\n    COALESCE(m.last_loaded, '1900-01-01') AS lastLoadedDate,\n\tm.watermark_type AS watermarkType,\n\tm.table_type AS tableType\nFROM INFORMATION_SCHEMA.TABLES t\nLEFT JOIN dbo.ETL_Table_Metadata m\n    ON t.TABLE_NAME = m.table_name\nWHERE \n\tt.TABLE_SCHEMA = 'dbo' and \n\tt.TABLE_NAME IN ('FactInternetSales', 'DimAccount', 'DimCustomer', 'DimPromotion', 'DimGeography', 'DimProduct', 'DimProductCategory', 'DimProductSubcategory', 'FactProductInventory');",
             "partitionOption": "None",
             "queryTimeout": "02:00:00"
           },
@@ -93,7 +93,7 @@
                     },
                     "schema": [],
                     "connectionSettings": {
-                      "name": "raqsconsole_LH",
+                      "name": "dev_raqsconsole_LH",
                       "properties": {
                         "type": "Lakehouse",
                         "typeProperties": {
@@ -283,7 +283,7 @@
           "secureInput": false,
           "secureOutput": false
         },
-        "name": "Load raw files to bronze layer as delta tables",
+        "name": "Load raw files from onelake to delta bronze",
         "dependsOn": [
           {
             "activity": "Iterate through each looked up table",
@@ -296,8 +296,8 @@
       {
         "type": "TridentNotebook",
         "typeProperties": {
-          "notebookId": "dc0a21db-39e0-47dd-8526-8997e278d2cb",
-          "workspaceId": "6df05e67-30af-48c3-8841-b1aa8f82e95e"
+          "notebookId": "e278d2cb-8997-8526-47dd-39e0dc0a21db",
+          "workspaceId": "00000000-0000-0000-0000-000000000000"
         },
         "policy": {
           "timeout": "0.12:00:00",
@@ -306,12 +306,10 @@
           "secureInput": false,
           "secureOutput": false
         },
-        "name": "Transform data to datamart",
-        "state": "Inactive",
-        "onInactiveMarkAs": "Succeeded",
+        "name": "transformed data load to data mart",
         "dependsOn": [
           {
-            "activity": "Load raw files to bronze layer as delta tables",
+            "activity": "Load raw files from onelake to delta bronze",
             "dependencyConditions": [
               "Succeeded"
             ]

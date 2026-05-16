@@ -105,8 +105,8 @@ fabric-adventureworks-data-platform/
 ├── src/Notebook/                       # Transformation logic
 │   ├── Load_landing_files_to_bronze_layer.Notebook/
 │   │   └── notebook-content.py         # Raw → Bronze ingestion
-│   └── transformed to mart.Notebook/
-│       └── notebook-content.sql        # Bronze → Analytics transformation
+│   └── transform_to_mart.Notebook/
+│       └── notebook-content.sql        # Bronze → Analytics-ready Mart tables
 │
 └── src/Pipeline/                       # Data orchestration
     └── ELT_pipeline.DataPipeline/
@@ -135,7 +135,7 @@ Fact tables track the last load timestamp (watermark). Only new/changed data get
 
 ### Snapshot Dimensions
 
-Dimensions are fully reloaded daily. Simple & reliable for SCD Type 1 (overwrite) scenarios.
+Dimensions are fully reloaded daily as snapshots with `snapshot_date` partitioning. Each table stores the full dimension state for each business day, enabling time-travel analysis and SCD Type 1 (overwrite) patterns efficiently. Partitioned tables accelerate queries and simplify retention policies.
 
 ### Audit Trail
 

@@ -1,12 +1,11 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
   "metadata": {
-    "type": "Lakehouse",
-    "displayName": "dev_raqsconsole_LH",
-    "description": ""
+    "type": "DataPipeline",
+    "displayName": "Sharepoint_Data_Load"
   },
   "config": {
     "version": "2.0",
-    "logicalId": "61102d1e-c064-89ac-4f2b-201f4ea4f0aa"
+    "logicalId": "11656d48-b4d7-a85b-4bcf-5b5f6d09de46"
   }
 }
