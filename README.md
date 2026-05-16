@@ -43,7 +43,7 @@ Automatically ingests data from an **AdventureWorks SQL database** into a **meda
 
 ## Project Structure
 
-```bash
+```
 fabric-adventureworks-data-platform/
 ├── README.md                                 # This file
 ├── deploy.py                                 # Python script for fabric-cicd deployment
@@ -93,7 +93,7 @@ fabric-adventureworks-data-platform/
 
 ## Project Structure
 
-```bash
+```
 fabric-adventureworks-data-platform/
 ├── README.md                           # This file
 ├── deploy.py                           # Deployment script (fabric-cicd)
