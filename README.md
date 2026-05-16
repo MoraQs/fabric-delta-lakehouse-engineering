@@ -124,6 +124,31 @@ fabric-adventureworks-data-platform/
 
 **Phase 4: Deploy** → CI/CD automatically pushes code to UAT, then PROD after validation
 
+### End-to-End Pipeline Flow
+
+The orchestration pipeline follows this complete flow:
+
+![Fabric ELT Pipeline Architecture](docs/fabric_elt_pipeline.png)
+
+1. **Lookup Activity** - Queries `ETL_Table_Metadata` from Fabric SQL Database
+2. **Dynamic Discovery** - Retrieves table names, schemas, watermark columns, and load metadata
+3. **ForEach Loop** - Iterates over each discovered table
+4. **Copy Activity** - Ingests data from source into OneLake with dynamic partitioning
+5. **Bronze Layer Notebook** - Unions raw parquet files and writes to Bronze Delta tables
+6. **Transform Notebook** - Applies business logic to transform Bronze → Mart tables
+
+### Incremental Load Strategy
+
+The ForEach loop implements intelligent incremental loading for facts:
+
+![Incremental Strategy - Get Watermarks, Copy Data, Update Watermarks](docs/fabric_incremental_strategy.png)
+
+- **Get Watermark** - Retrieves the last successful load timestamp
+- **Copy Data Activity** - Conditionally copies only changed data (facts) or full snapshot (dimensions)
+- **Update Watermark** - Records new high-water mark for next incremental load
+
+This pattern minimizes data transfer and compute costs while maintaining data freshness.
+
 ## Core Features Explained
 
 ### Dynamic Discovery
