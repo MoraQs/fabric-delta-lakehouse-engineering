@@ -37,12 +37,13 @@ Automatically ingests data from an **AdventureWorks SQL database** into a **meda
 - **Storage**: OneLake with Delta Lake format
 - **Orchestration**: Fabric DataPipeline (dynamic lookup + ForEach loop)
 - **Transformation**: PySpark & Spark SQL Notebooks
+- **Deployment**: fabric-cicd Python SDK (Microsoft's official Infrastructure-as-Code tool)
 - **CI/CD**: Azure Pipelines with Service Principal authentication
 - **Language**: Python, SQL, YAML
 
 ## Project Structure
 
-```
+```bash
 fabric-adventureworks-data-platform/
 ├── README.md                                 # This file
 ├── deploy.py                                 # Python script for fabric-cicd deployment
@@ -92,7 +93,7 @@ fabric-adventureworks-data-platform/
 
 ## Project Structure
 
-```
+```bash
 fabric-adventureworks-data-platform/
 ├── README.md                           # This file
 ├── deploy.py                           # Deployment script (fabric-cicd)
@@ -171,10 +172,16 @@ The pipeline dynamically constructs partition paths using `formatDateTime()` fun
 
 ## Deployment Pipeline
 
-Push to `main` or `feature/*` branches → **Automated UAT Deployment**  
-✅ Pass UAT validation → **Automatic PROD Deployment** (main branch only)
+**Infrastructure-as-Code with fabric-cicd Python SDK** (Microsoft's official Fabric deployment tool):
 
-Environment-specific configs (workspace names, IDs) are managed in `parameter.yml` for seamless promotion.
+1. **Git-Stored Code** - All Fabric items (Notebooks, Pipelines, Lakehouse) version controlled
+2. **Automated Deploy** - `deploy.py` script publishes items to Fabric via fabric-cicd SDK
+3. **Environment Promotion** - Parameter find/replace handles UAT → PROD config changes
+4. **CI/CD Orchestration** - Azure Pipelines automates validation & promotion gates
+
+**Flow**: Git push → UAT deployment → ✅ Validation → PROD deployment (main branch only)
+
+Environment-specific configs in `parameter.yml` ensure code reusability across environments.
 
 ## Why This Approach?
 
